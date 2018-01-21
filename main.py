@@ -27,11 +27,12 @@ if __name__ == '__main__':
     parser = IOParser()
     try:
         parser.parseList("/sne/home/pprjevara/Documents/rp1/virtuaplant/documentation/modbus_io_list.csv")
-        parser.identifyProtocols()
+        device_list = parser.generateDataStructure()
     except Exception as e:
         print(e)
 
-    #2. Start sniffing in a dedicated thread
+    print(device_list)
+    #2. Start learning phase - learn valid states and the sequence
 
     #mySniffer = Sniffer(args.interface)
     #mySniffer.startSniffing()

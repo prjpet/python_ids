@@ -4,12 +4,16 @@ from objects import ModbusObject
 class IOParser:
     """ Parse the IO list and convert it to Devices and States used int the IDS """
 
-    def __init__(self, min_column_headers=("protocol","io_type", "tag_name", "address")):
+    def __init__(self, min_column_headers=["protocol","i/o type", "tag name", "address"]):
         """ path to IO list: Has to be in CSV format.
             column headers: To know what to expect """
 
         self.min_column_headers = min_column_headers
         self.file_content = []
+        self.indices = {}
+
+        for item in min_column_headers:
+            self.indices[item] = 0
 
     def __str__(self):
         """ everybody likes printable objects right?
@@ -70,24 +74,51 @@ class IOParser:
         else:
             raise Exception("Path to I/O file incorrect.")
 
+        self.fillIndices()
+        self.identifyProtocols()
+
+    def fillIndices(self):
+        """ store the index of the different columns for the min_column_headers """
+        #fill up list of indices
+        for item in self.min_column_headers:
+            self.indices[item] = self.file_content[0].index(item)
+
+
     def identifyProtocols(self):
         """ create a list of protocols from the parsed IO list
             SINCE we have verified that the correct columns are present"""
         #the index is identified where the word protocol is found
-        indexOfProtocols = self.file_content[0].index("protocol")
 
         currentProtocol = "none"
         listOfProtocols = []
         #since the first row contains labels, start from the second
         for row in self.file_content[1:]:
-            currentProtocol = row[indexOfProtocols].lower()
+            currentProtocol = row[self.indices["protocol"]].lower()
 
             if not currentProtocol in listOfProtocols:
                 listOfProtocols.append(currentProtocol)
 
-        print(listOfProtocols)
+        self.listOfProtocols = listOfProtocols
 
 
     def generateDataStructure(self):
         """ when called, creates the devices that are reachable through the differnet protocols,
-            based on the IO list """
+            based on the IO list
+            Devices are indexed by their address within the list for now for faster retrieval
+            The type of it might change to dictionary, and organised by protocol if necessary"""
+        device_data = {}
+
+        #in the io list each line is an object
+        for row in self.file_content[1:]:
+
+            new_device = ModbusObject( row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ] ) )
+
+            device_data[str( row[ self.indices["address"] ])] = new_device
+
+        return device_data
+
+    def digital(self, iotype):
+        if iotype[0].lower() == "d":
+            return True
+        else:
+            return False

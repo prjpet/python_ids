@@ -19,7 +19,9 @@ class Sniffer:
         return "<Protocols and layers: {0}>".format(self.protocolLayers)
 
     def startSniffing(self):
-        """ based on the initialised information, starts sniffing for specific packets """
+        """ based on the initialised information, starts sniffing for specific packets
+            The engineer can do the following: """
+
 
         for packet in self.capture.sniff_continuously():
             # a single packet can only be either of the protocols - check that and set layer variables based on that
@@ -46,6 +48,18 @@ class Sniffer:
         #                every trans_id is for a pair of messages - an initial message and a response
         #    - func_code: the function code of the modbus function
         #    - word_cnt: how many registers
+
+        #Since devices are organised by address in the device_list dictionary, the following can be done:
+        #    - if message to an address is caught that is not in the list, raise alarm and note address and value
+        #            - potentially BLOCK the message if allowed (sniffer placed on link between HMI and device)
+        #    - if message to a known address is caught AND in learning phase, save the state
+        #            - compare the state by hashing
+        #    - BUILD SEQUENCE DIAGRAM from learned states using the state object
+        #            - the learning state should work independently from the IO list
+        #            - device tag - state
+        #            - write to xml or csv
+        #            - when in ENFORCEMENT, parse csv and use that, this way the system is not a black box
+        #    - if in the enforcement phase, register good messages counter
 
         required_layer = self.packet["modbus"]
 
