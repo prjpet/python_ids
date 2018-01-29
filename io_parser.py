@@ -109,8 +109,9 @@ class IOParser:
         device_data = {}
 
         #in the io list each line is an object
+        #except the first one
         for row in self.file_content[1:]:
-
+            #print(row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ]))
             new_device = ModbusObject( row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ] ) )
 
             device_data[str( row[ self.indices["address"] ])] = new_device
