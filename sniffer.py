@@ -9,7 +9,9 @@ class Dissector:
         self.packet = None
         #self.protocols = protocols
         #self.setProtocolVariables()
-
+        self.readRange = 0
+        self.readingFrom = 0
+        self.data = ''
 
     def __str__(self):
         """ everybody likes printable objects right?
@@ -18,7 +20,7 @@ class Dissector:
         return "<Protocols and layers: {0}>".format(self.protocolLayers)
 
 
-    def dissectModbus(self, packet, protocolAttributes):
+    def dissectModbus(self, packet):
         """ if the protocol is found in the packet, dissect the packet based on modbus characteristics """
         #Since we know that the system is using modbus
         #From the IO list we can also retrieve what registers are we reading
@@ -40,41 +42,28 @@ class Dissector:
         #    - if in the enforcement phase, register good messages counter
 
         required_layer = packet["modbus"]
-
-        protocolAttributes["modbus"]["trans_id"] = packet["mbtcp"].trans_id
-        protocolAttributes["modbus"]["func_code"] = required_layer.func_code
-        command = True
-
-        #print("ID: ", trans_id, "FC: ", func_code)
-        #if this is the same transaction as before, it's a responsible else it's a command
-        if protocolAttributes["modbus"]["trans_id"] == protocolAttributes["modbus"]["prev_trans_id"] and protocolAttributes["modbus"]["func_code"] == protocolAttributes["modbus"]["prev_func_code"]: command = True
-        else: command = False
-
         #to avoid errors, verify whether the packet has the required attribute
         if hasattr(required_layer, 'data'):
-            #writing is happening
-            print(command, "Write data: ", required_layer.data, ", to address: ", required_layer.reference_num)
-            
-
+            #print(command_response, "Write data: ", required_layer.data, ", to address: ", required_layer.reference_num)
+            self.data = required_layer.data.replace(":","")
+            return {"func_code": required_layer.func_code, "trans_id": packet["mbtcp"].trans_id, "address": required_layer.reference_num, "data": int(self.data, 16)}
         #to avoid errors, verify whether the packet has the required attribute
         elif hasattr(required_layer, 'word_cnt'):
-            #request for reading_multiple_registers is happening
-            protocolAttributes["modbus"]["reading_from"]  = int(required_layer.reference_num)
-            protocolAttributes["modbus"]["holding_reg_range"] = int(required_layer.word_cnt)
-            print(command, "Reading data from register ", protocolAttributes["modbus"]["reading_from"], ", " , protocolAttributes["modbus"]["holding_reg_range"], " registers:")
-
+            self.readingFrom = required_layer.reference_num
+            self.readRange = required_layer.word_cnt
+            #print(command_response, "Reading data from register ", protocolAttributes["modbus"]["reading_from"], ", " , protocolAttributes["modbus"]["holding_reg_range"], " registers:")
+            return {"func_code": required_layer.func_code, "trans_id": packet["mbtcp"].trans_id, "address": self.readingFrom, "range": self.readRange}
         #to avoid errors, verify whether the packet has the required attribute
         elif hasattr(required_layer, 'reg16'):
-            print(command, "Reading data from ", protocolAttributes["modbus"]["holding_reg_range"], " registers.")
+            contents = []
+            #print(command_response, "Reading data from ", protocolAttributes["modbus"]["holding_reg_range"], " registers.")
             #In theory, the above extracted word_cnt can be used to set the for
-            for i in range (0, protocolAttributes["modbus"]["holding_reg_range"]):
-                print(required_layer.reg16.all_fields[i].showname_key,": ", required_layer.reg16.all_fields[i].showname_value )
-
+            for i in range (0, int(self.readRange)):
+                #print(required_layer.reg16.all_fields[i].showname_key,": ", required_layer.reg16.all_fields[i].showname_value )
+                contents.append(required_layer.reg16.all_fields[i].showname_value)
+            return {"func_code": required_layer.func_code, "trans_id": packet["mbtcp"].trans_id, "address": self.readingFrom, "range": self.readRange, "contents": contents}
         else:
             raise Exception("Fatal Error: No modbus variables can be found.")
-
-        protocolAttributes["modbus"]["prev_trans_id"] = protocolAttributes["modbus"]["trans_id"]
-        protocolAttributes["modbus"]["prev_func_code"] = protocolAttributes["modbus"]["func_code"]
 
     def dissectS7(self):
         raise NotImplementedError(self.__class__.__name__ + '.dissectS7()')

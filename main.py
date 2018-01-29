@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     #all devices lists should be indexed based on the addresses they are using, so when
     #a packet is captured, the respective device can be filtered out easily
-    print(modbus_device_list)
+    #print(modbus_device_list)
 
     #protocol can also be sniffed but for proof of concept we will just assume modbus only
     protocols = ["modbus"]
@@ -62,9 +62,34 @@ if __name__ == '__main__':
     capture = pyshark.LiveCapture(interface=args.interface)
     myDissector = Dissector()
 
-    for packet in capture.sniff_continuously():
+    REQUEST_COUNTER = 0
+    RESPONSE_COUNTER = 0
+    DROPPED_PACKET_COUNTER = 0
+    REQ_RES_MAX_ERROR = 0
+    packet_contents = 0
+    previous_packet_contents = ""
+
+    ANOMALY_COUNTER = 0
+
+    #TODO - move this into a separate THREAD using threading or multiprocessing
+    for i, packet in enumerate(capture.sniff_continuously()):
         for protocol in protocolVariables["protocolLayers"]:
 
+            #if the highest layer of the packet is in the protocol variables of the current protocol,
+            #then we have identified the protocol
             if packet.highest_layer.lower() in protocolVariables["protocolLayers"][protocol]:
 
-                    myDissector.dissectModbus(packet, protocolVariables["protocolAttributes"])
+                    if i == 0:
+                        packet_contents = myDissector.dissectModbus(packet)
+                    else:
+                        previous_packet_contents = packet_contents
+                        packet_contents = myDissector.dissectModbus(packet)
+
+                    #meaning packet is for the same transaction
+                        if packet_contents["func_code"] == previous_packet_contents["func_code"] and \
+                        packet_contents["trans_id"] == previous_packet_contents["trans_id"]:
+                            RESPONSE_COUNTER += 1
+                        else:
+                            REQUEST_COUNTER += 1
+
+            print(i, packet_contents, RESPONSE_COUNTER, REQUEST_COUNTER)
