@@ -34,7 +34,7 @@ class SystemState:
         self.address = address
         self.value = value
         self.current_state = {}
-        self.defautl_state = {}
+        self.default_state = []
         self.valid_states = [{}]
 
 
@@ -45,6 +45,3 @@ class SystemState:
         return "<{0} {1}>".format(\
                 self.address,\
                 self.value)
-
-    def initValidStates():
-        print(".")

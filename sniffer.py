@@ -45,23 +45,25 @@ class Dissector:
         #to avoid errors, verify whether the packet has the required attribute
         if hasattr(required_layer, 'data'):
             #print(command_response, "Write data: ", required_layer.data, ", to address: ", required_layer.reference_num)
+            #data is received in hex format, with a colon separating each byte - so take the colon first...
+            #then next line, convert the data to int from hex int
             self.data = required_layer.data.replace(":","")
-            return {"func_code": required_layer.func_code, "trans_id": packet["mbtcp"].trans_id, "address": required_layer.reference_num, "data": int(self.data, 16)}
+            return {"func_code": int(required_layer.func_code), "trans_id": int(packet["mbtcp"].trans_id), "address": int(required_layer.reference_num), "data": int(self.data, 16)}
         #to avoid errors, verify whether the packet has the required attribute
         elif hasattr(required_layer, 'word_cnt'):
-            self.readingFrom = required_layer.reference_num
-            self.readRange = required_layer.word_cnt
+            self.readingFrom = int(required_layer.reference_num)
+            self.readRange = int(required_layer.word_cnt)
             #print(command_response, "Reading data from register ", protocolAttributes["modbus"]["reading_from"], ", " , protocolAttributes["modbus"]["holding_reg_range"], " registers:")
-            return {"func_code": required_layer.func_code, "trans_id": packet["mbtcp"].trans_id, "address": self.readingFrom, "range": self.readRange}
+            return {"func_code": int(required_layer.func_code), "trans_id": int(packet["mbtcp"].trans_id), "address": self.readingFrom, "range": self.readRange}
         #to avoid errors, verify whether the packet has the required attribute
         elif hasattr(required_layer, 'reg16'):
             contents = []
             #print(command_response, "Reading data from ", protocolAttributes["modbus"]["holding_reg_range"], " registers.")
             #In theory, the above extracted word_cnt can be used to set the for
-            for i in range (0, int(self.readRange)):
+            for i in range (0, self.readRange):
                 #print(required_layer.reg16.all_fields[i].showname_key,": ", required_layer.reg16.all_fields[i].showname_value )
-                contents.append(required_layer.reg16.all_fields[i].showname_value)
-            return {"func_code": required_layer.func_code, "trans_id": packet["mbtcp"].trans_id, "address": self.readingFrom, "range": self.readRange, "contents": contents}
+                contents.append(int(required_layer.reg16.all_fields[i].showname_value))
+            return {"func_code": int(required_layer.func_code), "trans_id": int(packet["mbtcp"].trans_id), "address":  self.readingFrom, "range": self.readRange, "contents": contents}
         else:
             raise Exception("Fatal Error: No modbus variables can be found.")
 
