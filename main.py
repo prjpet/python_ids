@@ -125,6 +125,7 @@ if __name__ == '__main__':
                 i += 1
                 #first packet
                 #capture time
+                #!!!!!_________BASTARD___________!!!!!
                 modbus_device_list = parser.generateDataStructure()
                 if i == 0:
                     packet_contents = myDissector.dissectModbus(packet)
