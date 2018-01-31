@@ -240,7 +240,12 @@ if __name__ == '__main__':
                                     #if we have registered a state previously, then we can measure Td between new state and previous
                                     #in order to build training model, need to grab these values, alongside with the block's analogue values
                                     #store them in a list each with the same index
-                                    #the result should be 1 list per
+                                    #the result should be 1 timestamped list / logical block of:
+                                    #    - timestamp
+                                    #    - Td for current state change
+                                    #    - analogue values as described in block
+                                    #Feed all this into LSTM, getting predictions for Td
+                                    #Also feed analogue values into LSTM asking for predictions for Analogue values
                                     if previous_system_state != 0:
                                         if hashed_block not in mySystemState.digital_statechart[logical_block][prev_hashed_block]["successors"]:
                                             mySystemState.digital_statechart[logical_block][prev_hashed_block]["successors"].append(hashed_block)
