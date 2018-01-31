@@ -4,7 +4,7 @@ from objects import ModbusObject
 class IOParser:
     """ Parse the IO list and convert it to Devices and States used int the IDS """
 
-    def __init__(self, min_column_headers=["protocol","i/o type", "tag name", "address"]):
+    def __init__(self, min_column_headers=["protocol","i/o type", "tag name", "address", "logical group"]):
         """ path to IO list: Has to be in CSV format.
             column headers: To know what to expect """
 
@@ -107,15 +107,15 @@ class IOParser:
             Devices are indexed by their address within the list for now for faster retrieval
             The type of it might change to dictionary, and organised by protocol if necessary"""
         device_data = {}
-
         #in the io list each line is an object
         #except the first one
         for row in self.file_content[1:]:
+
             #print(row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ]))
-            new_device = ModbusObject( row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ] ) )
+            #print(row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ]))
+            new_device = ModbusObject( row[ self.indices["tag name"] ], row[ self.indices["address"] ], self.digital( row[ self.indices["i/o type"] ] ), row[ self.indices["logical group"] ] )
 
             device_data[ int(row[ self.indices["address"] ]) ] = new_device
-
         return device_data
 
     def digital(self, iotype):
