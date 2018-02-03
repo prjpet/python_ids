@@ -2,6 +2,11 @@
 #dependencies: pyshark, tshark, wireshark
 
 import os, sys, pyshark, time, hashlib, math
+import numpy as np
+from sklearn.svm import SVR
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import learning_curve
+from sklearn.kernel_ridge import KernelRidge
 from utils import MyParser
 from sniffer import Dissector
 from io_parser import IOParser
@@ -77,6 +82,12 @@ def getState(packet_contents,device_list, i):
                 print(packet_contents)
                 sys.exit(3)
 
+        #for key in final_dict:
+            #print(key)
+            #for item in final_dict[key]:
+                #print(item)
+                #for thing in final_dict[key][item]:
+                    #print(thing)
         return final_dict
 
 if __name__ == '__main__':
@@ -106,13 +117,19 @@ if __name__ == '__main__':
     previous_packet_contents = ""
     request = False
 
-    mode = [[5,],[1200,],[0,]]
+    mode = [[5,],[300,]]
     mode_index = 0
 
     mySystemState = SystemState()
 
+
+    X = []
+    y = []
     TRAINING_DATA = {}
+    PREDICTION_SET = {}
     TRAINING_STATE_LIST = []
+    saveTime = False
+    in_state_time_start = 0
     LINE_COUNT = 0
     ANOMALY_COUNTER = 0
 
@@ -160,6 +177,8 @@ if __name__ == '__main__':
 
                             if next_packet_time - first_packet_time > mode[mode_index][0]:
                                 mode_index += 1
+                                #BUILD STATECHART FROM DIGITAL STATES before advancing to learning mode
+                                #Build digital only list
                                 mySystemState.buildStatechartFromDefault()
                                 current_system_state = 0
                                 previous_system_state = 0
@@ -185,8 +204,7 @@ if __name__ == '__main__':
 
                         elif mode_index == 1:
 
-                            #BUILD STATECHART FROM DIGITAL STATES
-                            #Build digital only list
+
                             """
                             ('***', 1, '***')  ----- Layer 1
                             ('***', 'analogue', '***') ----- Layer 2
@@ -205,25 +223,37 @@ if __name__ == '__main__':
                             if packet_contents["func_code"] == 3:
                                 if current_system_state == 0: print("********* LEARNING DEFAULTS FINISHED - HASHING DIGITAL STATE.**********")
 
+                                #THIS CAN BE SIGNIFICANTLY IMPROVED
                                 current_system_state = getState(packet_contents,modbus_device_list, i)
                                 current_time = time.time()
                                 #see if there is state change
 
-                                block_to_hash = ''
-                                prev_block_to_hash = ''
                                 for logical_block in current_system_state:
+                                    block_to_hash = ''
+                                    prev_block_to_hash = ''
 
                                     #roll through the items within the digital block and add to a string
+                                    #for l, item in enumerate(current_system_state[logical_block]["digital"]):
+                                        #print(current_system_state[logical_block]["digital"])
+
                                     for l, item in enumerate(current_system_state[logical_block]["digital"]):
                                         block_to_hash += str(item)
-                                        if previous_system_state != 0: prev_block_to_hash += str(previous_system_state[logical_block]["digital"][l])
+                                        if previous_system_state != 0:
+                                            prev_block_to_hash += str(previous_system_state[logical_block]["digital"][l])
 
+                                    #if logical_block == 2: print(block_to_hash, prev_block_to_hash)
                                     #add this state to the current digital state descriptor then compare with statechart basis...
                                     #if not found in statechart and we are in still thelearning phase, register successor, time delta and prob (which is index++/learning time total)
                                     hashed_block = mySystemState.hashState(block_to_hash)
                                     block_time = time.time()
                                     if previous_system_state != 0:
                                         prev_hashed_block = mySystemState.hashState(prev_block_to_hash)
+
+                                        #we have entered a new state
+                                        if hashed_block != prev_hashed_block and logical_block == 2:
+                                            saveTime = True
+                                            prev_block_in_state_time_total = current_time - in_state_time_start
+                                            in_state_time_start = time.time()
 
                                     #Have we seen this state before?
                                     if hashed_block in mySystemState.digital_statechart[logical_block]:
@@ -258,12 +288,11 @@ if __name__ == '__main__':
 
                                         training_line = []
                                         LINE_COUNT += 1
-                                        if logical_block == 2:
-                                            print(mySystemState.digital_statechart[logical_block])
-                                            print(str(prev_hashed_block) + str(hashed_block))
+                                        if saveTime:
+                                            saveTime = False
+                                            """
                                             current_transition = str(prev_hashed_block) + str(hashed_block)
-                                            if current_transition not in TRAINING_STATE_LIST:
-                                                TRAINING_STATE_LIST.append(current_transition)
+
 
 
                                             training_line.append(str(LINE_COUNT))
@@ -271,15 +300,32 @@ if __name__ == '__main__':
                                             training_line.append(str(round(current_time_delta, 3)))
                                             for analogue_device in current_system_state[logical_block]["analogue"]:
                                                 training_line.append(str(analogue_device.state))
+                                            """
+                                            if prev_hashed_block not in TRAINING_STATE_LIST:
+                                                TRAINING_STATE_LIST.append(prev_hashed_block)
 
-                                            if logical_block in TRAINING_DATA:
-                                                TRAINING_DATA[logical_block].append(training_line)
-                                            else:
-                                                TRAINING_DATA[logical_block] = [training_line]
+                                            state_id = TRAINING_STATE_LIST.index(prev_hashed_block)
+
+                                            if state_id not in TRAINING_DATA: TRAINING_DATA[state_id] = {"x":[],"y":[]}
+
+                                            training_line.append(str(LINE_COUNT))
+                                            training_line.append(str(state_id))
+                                            training_line.append(str(prev_block_in_state_time_total))
+
+                                            #besides creating line to print, also create a training datased
+                                            #in the following format:
+                                            #TRAINING_DATA[state_id] = {"x":[],"y":[]}
+                                            #then run sklearn on all the different states and create a prediction model
+                                            TRAINING_DATA[state_id]["y"].append(prev_block_in_state_time_total)
+                                            for analogue_device in current_system_state[logical_block]["analogue"]:
+                                                training_line.append(str(analogue_device.state))
+                                                TRAINING_DATA[state_id]["x"].append(analogue_device.state)
+
+
                                             with open('test_data'+str(logical_block)+'.txt', 'a') as the_file:
+                                                output = ', '.join(training_line) + "\n"
                                                 print(', '.join(training_line))
-                                                the_file.write(', '.join(training_line))
-
+                                                the_file.write(output)
 
 
 
@@ -297,3 +343,50 @@ if __name__ == '__main__':
                                 if next_packet_time - normal_learning_start > mode[mode_index][0]:
                                     mode_index += 1
                                     print("********* LEARNING NORMAL finished - advancing to MODEL TRAINING. **********")
+                                    t0 = time.time()
+                                    # Create modeller
+                                    svr = GridSearchCV(SVR(kernel='rbf', gamma=0.1), cv=2,
+                                                       param_grid={"C": [1e0, 1e1, 1e2, 1e3],
+                                                                   "gamma": np.logspace(-2, 2, 5)})
+
+                                    #for each and every recorded state
+                                    for state_id in TRAINING_DATA:
+                                        X = []
+                                        y = []
+                                        PREDICTION_LIST = []
+                                        #create numpy arrays
+                                        #float can also be used instead of int depending on data, for TIME use float
+                                        for i, item in enumerate(TRAINING_DATA[state_id]["x"]):
+                                            X.append([int(item)])
+                                            y.append([float(TRAINING_DATA[state_id]["y"][i])])
+
+                                        X = np.array(X)
+                                        y = np.array(y).ravel()
+
+                                        #fit the data
+                                        svr.fit(X, y)
+
+                                        #create prediction plot based on min/max range observed
+                                        #should we calculate this all the time? or select the highest range once
+                                        X_plot = np.linspace(np.amin(X), np.amax(X), 1000)[:, None]
+                                        PREDICTION_LIST = svr.predict(X_plot)
+
+                                        PREDICTION_SET[state_id] = {"x": X_plot, "y": PREDICTION_LIST}
+                                    print("Model training took: ", time.time()-t0)
+
+                        elif mode_index == 2:
+                            print("******************** ENFORCING LEARNED MODELS ********************")
+
+                            #PSEUDOCODE FOR enforcement
+                            #Can use 6 or modbus 3, depending on preference for detection or prevention
+                            #for ease of proof use 3 now
+                            #do the same exact thing as at learning:
+                            #   - get digital states, and hash them
+                            #ADDITIONALLY:
+                            #   - if a state is not in the statechart DB,
+                            #RAISE ALARM
+                            #   - measure the time between state changes
+                            #   - correlate them with analogue Values
+                            #ADDITIONALLY:
+                            #   - if a value is not in the PREDICTION_SET +- error range
+                            #RAISE ALARM

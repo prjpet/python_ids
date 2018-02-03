@@ -57,6 +57,7 @@ class SystemState:
             #self.digital_statechart = { 1:{"state1": {"successors": [] , "time_delta": [], "prob": []} }, 2:{} }
             if k in self.digital_statechart:
 
+
                 for element in self.state[k]["digital"]:
                     string_to_hash += str(element)
 
@@ -64,7 +65,6 @@ class SystemState:
 
             else:
                 self.digital_statechart[k] = {}
-
                 for element in self.state[k]["digital"]:
                     string_to_hash += str(element)
 
@@ -73,4 +73,4 @@ class SystemState:
         print(self.digital_statechart)
 
     def hashState(self, state):
-        return hashlib.sha256(state).hexdigest()
+        return hashlib.sha256(state.encode('utf-8')).hexdigest()
